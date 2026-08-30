@@ -1,5 +1,6 @@
 package nukkaddrop_backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -13,10 +14,19 @@ public class User {
     private Long id;
     private String name;
     private String email;
+
+    @JsonIgnore
     private String password;
 
     @Enumerated(EnumType.STRING)
     private Role role;
+
+    public enum Role{
+        BUSINESS_OWNER,
+        SHOPKEEPER,
+        DELIVERY_PARTNER,
+        ADMIN
+    }
 
     public Long getId(){
         return id;

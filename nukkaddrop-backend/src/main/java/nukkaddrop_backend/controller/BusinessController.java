@@ -39,6 +39,10 @@ public class BusinessController {
             return null;
         }
 
+        if(owner.getRole()!=User.Role.BUSINESS_OWNER){
+            return null;
+        }
+
         business.setOwner(owner);
 
         return businessRepository.save(business);
@@ -71,5 +75,22 @@ public class BusinessController {
         }
 
         return "Business not found";
+    }
+
+    @PostMapping("/{businessId}/shopkeepers/{shopkeeperId}")
+    public Business addShopkeeper(@PathVariable Long businessId, @PathVariable Long shopkeeperId){
+        Business business=businessRepository.findById(businessId).orElse(null);
+        User shopkeeper=userRepository.findById(shopkeeperId).orElse(null);
+
+        if (business==null||shopkeeper==null){
+            return null;
+        }
+
+        if (shopkeeper.getRole()!=User.Role.SHOPKEEPER){
+            return null;
+        }
+
+        business.getShopkeepers().add(shopkeeper);
+        return businessRepository.save(business);
     }
 }
