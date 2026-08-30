@@ -2,6 +2,9 @@ package nukkaddrop_backend.entity;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "business")
 public class Business {
@@ -17,6 +20,15 @@ public class Business {
     @ManyToOne
     @JoinColumn(name = "owner_id")
     private User owner;
+
+    @ManyToMany
+    @JoinTable(
+            name = "business_shopkeepers",
+            joinColumns = @JoinColumn(name = "business_id"),
+            inverseJoinColumns = @JoinColumn(name = "shopkeeper_id")
+    )
+
+    private List<User>shopkeepers=new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -64,5 +76,13 @@ public class Business {
 
     public void setOwner(User owner) {
         this.owner = owner;
+    }
+
+    public List<User> getShopkeepers() {
+        return shopkeepers;
+    }
+
+    public void setShopkeepers(List<User> shopkeepers) {
+        this.shopkeepers = shopkeepers;
     }
 }
