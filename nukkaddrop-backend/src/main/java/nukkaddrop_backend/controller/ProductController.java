@@ -15,52 +15,78 @@ public class ProductController {
     private final ProductRepository productRepository;
     private final BusinessRepository businessRepository;
 
-    public ProductController(ProductRepository productRepository,BusinessRepository businessRepository){
-        this.productRepository=productRepository;
-        this.businessRepository=businessRepository;
+    public ProductController(
+            ProductRepository productRepository,
+            BusinessRepository businessRepository) {
+
+        this.productRepository = productRepository;
+        this.businessRepository = businessRepository;
     }
 
     @GetMapping
-    public List<Product>getAllProducts(){
+    public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
 
+    @GetMapping("/{id}")
+    public Product getProductById(@PathVariable Long id) {
+        return productRepository.findById(id)
+                .orElse(null);
+    }
+
     @PostMapping
-    public Product createProduct(@RequestParam Long businessId,@RequestBody Product product){
+    public Product createProduct(
+            @RequestParam Long businessId,
+            @RequestBody Product product) {
 
-        Business business=businessRepository.findById(businessId).orElse(null);
+        Business business = businessRepository.findById(businessId)
+                .orElse(null);
 
-        if (business==null){
+        if (business == null) {
             return null;
         }
 
         product.setBusiness(business);
+
         return productRepository.save(product);
     }
 
     @PutMapping("/{id}")
-    public Product updateProduct(@PathVariable Long id,@RequestBody Product updateProduct){
+    public Product updateProduct(
+            @PathVariable Long id,
+            @RequestBody Product updatedProduct) {
 
-        return productRepository.findById(id).map(product -> {
+        return productRepository.findById(id)
+                .map(product -> {
 
-            product.setProductName(updateProduct.getProductName());
-            product.setProductPrice(updateProduct.getProductPrice());
-            product.setProductDescription(updateProduct.getProductDescription());
-            product.setProductCategory(updateProduct.getProductCategory());
-            product.setProductStock(updateProduct.getProductStock());
+                    product.setProductName(
+                            updatedProduct.getProductName());
 
-            return productRepository.save(product);
-        }).orElse(null);
+                    product.setProductPrice(
+                            updatedProduct.getProductPrice());
+
+                    product.setProductDescription(
+                            updatedProduct.getProductDescription());
+
+                    product.setProductCategory(
+                            updatedProduct.getProductCategory());
+
+                    product.setProductStock(
+                            updatedProduct.getProductStock());
+
+                    return productRepository.save(product);
+                })
+                .orElse(null);
     }
 
     @DeleteMapping("/{id}")
-    public String deleteProduct(@PathVariable Long id){
+    public String deleteProduct(@PathVariable Long id) {
 
-        if (productRepository.existsById(id)){
+        if (productRepository.existsById(id)) {
             productRepository.deleteById(id);
             return "Product deleted successfully";
         }
 
-        return "product not found";
+        return "Product not found";
     }
 }
