@@ -2,7 +2,7 @@ package nukkaddrop_backend.controller;
 
 import nukkaddrop_backend.entity.User;
 import nukkaddrop_backend.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,8 +11,16 @@ import java.util.List;
 @RequestMapping("/api/users")
 public class UserController {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserController(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder) {
+
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @GetMapping
     public List<User> getAllUsers() {
@@ -20,18 +28,43 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public User getUserById(@PathVariable Long id){
-        return userRepository.findById(id).orElse(null);
+    public User getUserById(@PathVariable Long id) {
+
+        return userRepository.findById(id)
+                .orElse(null);
+    }
+
+    @PostMapping
+    public User createUser(@RequestBody User user) {
+
+        user.setPassword(
+                passwordEncoder.encode(user.getPassword())
+        );
+
+        return userRepository.save(user);
     }
 
     @PutMapping("/{id}")
-    public User updateUser(@PathVariable Long id, @RequestBody User updatedUser) {
+    public User updateUser(
+            @PathVariable Long id,
+            @RequestBody User updatedUser) {
 
         return userRepository.findById(id)
                 .map(user -> {
+
                     user.setName(updatedUser.getName());
                     user.setEmail(updatedUser.getEmail());
-                    user.setPassword(updatedUser.getPassword());
+
+                    if (updatedUser.getPassword() != null &&
+                            !updatedUser.getPassword().isBlank()) {
+
+                        user.setPassword(
+                                passwordEncoder.encode(
+                                        updatedUser.getPassword()
+                                )
+                        );
+                    }
+
                     user.setRole(updatedUser.getRole());
 
                     return userRepository.save(user);
@@ -40,19 +73,15 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    public String deleteUser(@PathVariable Long id){
+    public String deleteUser(@PathVariable Long id) {
 
-        if (userRepository.existsById(id)){
+        if (userRepository.existsById(id)) {
+
             userRepository.deleteById(id);
+
             return "User deleted successfully";
         }
 
         return "User not found";
     }
-
-    @PostMapping
-    public User createUser(@RequestBody User user) {
-        return userRepository.save(user);
-    }
-
 }
