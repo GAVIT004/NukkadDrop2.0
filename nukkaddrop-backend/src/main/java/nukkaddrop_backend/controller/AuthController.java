@@ -4,6 +4,9 @@ import nukkaddrop_backend.dto.LoginRequest;
 import nukkaddrop_backend.dto.LoginResponse;
 import nukkaddrop_backend.entity.User;
 import nukkaddrop_backend.service.AuthService;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,7 +20,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public LoginResponse login(
+    public ResponseEntity<?> login(
             @RequestBody LoginRequest request) {
 
         User user = authService.authenticate(
@@ -25,12 +28,20 @@ public class AuthController {
                 request.getPassword()
         );
 
+        // Invalid credentials
         if (user == null) {
-            return null;
+
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Invalid email or password");
         }
 
+        // Generate JWT
         String token = authService.generateToken(user);
 
-        return new LoginResponse(token, user);
+        // Return token + user
+        return ResponseEntity.ok(
+                new LoginResponse(token, user)
+        );
     }
 }

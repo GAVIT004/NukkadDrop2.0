@@ -1,5 +1,6 @@
 package nukkaddrop_backend.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -27,8 +28,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http)
-            throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
 
         http
                 .csrf(csrf -> csrf.disable())
@@ -41,17 +42,55 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // LOGIN IS PUBLIC
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/login"
                         ).permitAll()
 
-                        // EVERYTHING ELSE REQUIRES JWT
+                        .requestMatchers(
+                                "/api/users/shopkeeper-test"
+                        ).hasRole("SHOPKEEPER")
+
                         .anyRequest().authenticated()
                 )
 
-                // JWT FILTER
+                .exceptionHandling(exception -> exception
+
+                        .authenticationEntryPoint(
+                                (request, response, authException) -> {
+
+                                    response.setStatus(
+                                            HttpServletResponse.SC_UNAUTHORIZED
+                                    );
+
+                                    response.setContentType(
+                                            "application/json"
+                                    );
+
+                                    response.getWriter().write(
+                                            "{\"error\":\"Unauthorized - JWT token required\"}"
+                                    );
+                                }
+                        )
+
+                        .accessDeniedHandler(
+                                (request, response, accessDeniedException) -> {
+
+                                    response.setStatus(
+                                            HttpServletResponse.SC_FORBIDDEN
+                                    );
+
+                                    response.setContentType(
+                                            "application/json"
+                                    );
+
+                                    response.getWriter().write(
+                                            "{\"error\":\"Forbidden - insufficient permissions\"}"
+                                    );
+                                }
+                        )
+                )
+
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
