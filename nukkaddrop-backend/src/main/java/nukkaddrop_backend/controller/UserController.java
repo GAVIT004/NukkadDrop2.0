@@ -29,9 +29,13 @@ public class UserController {
 
     @GetMapping("/{id}")
     public User getUserById(@PathVariable Long id) {
-
         return userRepository.findById(id)
                 .orElse(null);
+    }
+
+    @GetMapping("/shopkeeper-test")
+    public String shopkeeperTest() {
+        return "SHOPKEEPER access granted";
     }
 
     @PostMapping
@@ -76,9 +80,7 @@ public class UserController {
     public String deleteUser(@PathVariable Long id) {
 
         if (userRepository.existsById(id)) {
-
             userRepository.deleteById(id);
-
             return "User deleted successfully";
         }
 
