@@ -1,6 +1,7 @@
 package nukkaddrop_backend.controller;
 
 import nukkaddrop_backend.dto.OrderRequest;
+import nukkaddrop_backend.entity.Business;
 import nukkaddrop_backend.entity.Order;
 import nukkaddrop_backend.entity.User;
 import nukkaddrop_backend.repository.OrderRepository;
@@ -32,14 +33,103 @@ public class OrderController {
 
     // GET ALL ORDERS
     @GetMapping
-    public List<Order> getAllOrders() {
-        return orderRepository.findAll();
+    public ResponseEntity<?> getAllOrders(
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        User loggedInUser = userRepository
+                .findByEmail(email)
+                .orElse(null);
+
+        if (loggedInUser == null) {
+            return ResponseEntity.status(401)
+                    .body("Unauthorized");
+        }
+
+        List<Order> allOrders =
+                orderRepository.findAll();
+
+        if (loggedInUser.getRole() == User.Role.ADMIN) {
+            return ResponseEntity.ok(allOrders);
+        }
+
+        if (loggedInUser.getRole()
+                == User.Role.BUSINESS_OWNER) {
+
+            List<Order> ownerOrders =
+                    allOrders.stream()
+                            .filter(order ->
+                                    order.getBusiness() != null &&
+                                            order.getBusiness().getOwner() != null &&
+                                            order.getBusiness()
+                                                    .getOwner()
+                                                    .getId()
+                                                    .equals(
+                                                            loggedInUser.getId()
+                                                    )
+                            )
+                            .toList();
+
+            return ResponseEntity.ok(ownerOrders);
+        }
+
+        if (loggedInUser.getRole()
+                == User.Role.SHOPKEEPER) {
+
+            List<Order> shopkeeperOrders =
+                    allOrders.stream()
+                            .filter(order ->
+                                    order.getShopkeeper() != null &&
+                                            order.getShopkeeper()
+                                                    .getId()
+                                                    .equals(
+                                                            loggedInUser.getId()
+                                                    )
+                            )
+                            .toList();
+
+            return ResponseEntity.ok(shopkeeperOrders);
+        }
+
+        if (loggedInUser.getRole()
+                == User.Role.DELIVERY_PARTNER) {
+
+            List<Order> deliveryOrders =
+                    allOrders.stream()
+                            .filter(order ->
+                                    order.getDeliveryPartner() != null &&
+                                            order.getDeliveryPartner()
+                                                    .getId()
+                                                    .equals(
+                                                            loggedInUser.getId()
+                                                    )
+                            )
+                            .toList();
+
+            return ResponseEntity.ok(deliveryOrders);
+        }
+
+        return ResponseEntity.status(403)
+                .body("Forbidden");
     }
 
     // GET ORDER BY ID
     @GetMapping("/{id}")
     public ResponseEntity<?> getOrderById(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        User loggedInUser = userRepository
+                .findByEmail(email)
+                .orElse(null);
+
+        if (loggedInUser == null) {
+            return ResponseEntity.status(401)
+                    .body("Unauthorized");
+        }
 
         Order order = orderRepository
                 .findById(id)
@@ -49,7 +139,65 @@ public class OrderController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(order);
+        if (loggedInUser.getRole() == User.Role.ADMIN) {
+            return ResponseEntity.ok(order);
+        }
+
+        if (loggedInUser.getRole()
+                == User.Role.BUSINESS_OWNER) {
+
+            if (order.getBusiness() != null &&
+                    order.getBusiness().getOwner() != null &&
+                    order.getBusiness()
+                            .getOwner()
+                            .getId()
+                            .equals(loggedInUser.getId())) {
+
+                return ResponseEntity.ok(order);
+            }
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - you can only view orders belonging to your own business"
+                    );
+        }
+
+        if (loggedInUser.getRole()
+                == User.Role.SHOPKEEPER) {
+
+            if (order.getShopkeeper() != null &&
+                    order.getShopkeeper()
+                            .getId()
+                            .equals(loggedInUser.getId())) {
+
+                return ResponseEntity.ok(order);
+            }
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - you can only view your own orders"
+                    );
+        }
+
+        if (loggedInUser.getRole()
+                == User.Role.DELIVERY_PARTNER) {
+
+            if (order.getDeliveryPartner() != null &&
+                    order.getDeliveryPartner()
+                            .getId()
+                            .equals(loggedInUser.getId())) {
+
+                return ResponseEntity.ok(order);
+            }
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - you can only view orders assigned to you"
+                    );
+        }
+
+        return ResponseEntity.status(403)
+                .body("Forbidden");
     }
 
     // CREATE ORDER
@@ -97,7 +245,28 @@ public class OrderController {
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateOrderStatus(
             @PathVariable Long id,
-            @RequestParam Order.OrderStatus status) {
+            @RequestParam Order.OrderStatus status,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        User loggedInUser = userRepository
+                .findByEmail(email)
+                .orElse(null);
+
+        if (loggedInUser == null) {
+            return ResponseEntity.status(401)
+                    .body("Unauthorized");
+        }
+
+        if (loggedInUser.getRole()
+                != User.Role.BUSINESS_OWNER) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - only BUSINESS_OWNER can update order status"
+                    );
+        }
 
         Order order = orderRepository
                 .findById(id)
@@ -105,6 +274,32 @@ public class OrderController {
 
         if (order == null) {
             return ResponseEntity.notFound().build();
+        }
+
+        Business business = order.getBusiness();
+
+        if (business == null) {
+            return ResponseEntity.status(400)
+                    .body(
+                            "Order is not associated with a business"
+                    );
+        }
+
+        if (business.getOwner() == null) {
+            return ResponseEntity.status(400)
+                    .body(
+                            "Business does not have an owner"
+                    );
+        }
+
+        if (!business.getOwner()
+                .getId()
+                .equals(loggedInUser.getId())) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - you can only update orders belonging to your own business"
+                    );
         }
 
         Order.OrderStatus currentStatus =
@@ -130,7 +325,8 @@ public class OrderController {
 
         } else if (currentStatus == Order.OrderStatus.PREPARING) {
 
-            if (status == Order.OrderStatus.READY_FOR_DELIVERY) {
+            if (status ==
+                    Order.OrderStatus.READY_FOR_DELIVERY) {
 
                 validTransition = true;
             }
@@ -155,7 +351,28 @@ public class OrderController {
     @PutMapping("/{orderId}/delivery-partner/{deliveryPartnerId}")
     public ResponseEntity<?> assignDeliveryPartner(
             @PathVariable Long orderId,
-            @PathVariable Long deliveryPartnerId) {
+            @PathVariable Long deliveryPartnerId,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        User loggedInUser = userRepository
+                .findByEmail(email)
+                .orElse(null);
+
+        if (loggedInUser == null) {
+            return ResponseEntity.status(401)
+                    .body("Unauthorized");
+        }
+
+        if (loggedInUser.getRole()
+                != User.Role.BUSINESS_OWNER) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - only BUSINESS_OWNER can assign delivery partners"
+                    );
+        }
 
         Order order = orderRepository
                 .findById(orderId)
@@ -163,6 +380,41 @@ public class OrderController {
 
         if (order == null) {
             return ResponseEntity.notFound().build();
+        }
+
+        Business business = order.getBusiness();
+
+        if (business == null) {
+            return ResponseEntity.status(400)
+                    .body(
+                            "Order is not associated with a business"
+                    );
+        }
+
+        if (business.getOwner() == null) {
+            return ResponseEntity.status(400)
+                    .body(
+                            "Business does not have an owner"
+                    );
+        }
+
+        if (!business.getOwner()
+                .getId()
+                .equals(loggedInUser.getId())) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - you can only assign delivery partners to orders belonging to your own business"
+                    );
+        }
+
+        if (order.getStatus()
+                != Order.OrderStatus.READY_FOR_DELIVERY) {
+
+            return ResponseEntity.badRequest()
+                    .body(
+                            "Order must be READY_FOR_DELIVERY before assigning a delivery partner"
+                    );
         }
 
         User deliveryPartner = userRepository
@@ -179,15 +431,6 @@ public class OrderController {
             return ResponseEntity.badRequest()
                     .body(
                             "Selected user is not a DELIVERY_PARTNER"
-                    );
-        }
-
-        if (order.getStatus()
-                != Order.OrderStatus.READY_FOR_DELIVERY) {
-
-            return ResponseEntity.badRequest()
-                    .body(
-                            "Order must be READY_FOR_DELIVERY before assigning a delivery partner"
                     );
         }
 
@@ -206,7 +449,28 @@ public class OrderController {
     @PutMapping("/{orderId}/delivered/{deliveryPartnerId}")
     public ResponseEntity<?> markOrderDelivered(
             @PathVariable Long orderId,
-            @PathVariable Long deliveryPartnerId) {
+            @PathVariable Long deliveryPartnerId,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        User loggedInUser = userRepository
+                .findByEmail(email)
+                .orElse(null);
+
+        if (loggedInUser == null) {
+            return ResponseEntity.status(401)
+                    .body("Unauthorized");
+        }
+
+        if (loggedInUser.getRole()
+                != User.Role.DELIVERY_PARTNER) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - only DELIVERY_PARTNER can mark orders delivered"
+                    );
+        }
 
         Order order = orderRepository
                 .findById(orderId)
@@ -214,23 +478,6 @@ public class OrderController {
 
         if (order == null) {
             return ResponseEntity.notFound().build();
-        }
-
-        User deliveryPartner = userRepository
-                .findById(deliveryPartnerId)
-                .orElse(null);
-
-        if (deliveryPartner == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (deliveryPartner.getRole()
-                != User.Role.DELIVERY_PARTNER) {
-
-            return ResponseEntity.badRequest()
-                    .body(
-                            "Selected user is not a DELIVERY_PARTNER"
-                    );
         }
 
         if (order.getStatus()
@@ -242,10 +489,19 @@ public class OrderController {
                     );
         }
 
+        if (!loggedInUser.getId()
+                .equals(deliveryPartnerId)) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - you can only mark orders delivered for yourself"
+                    );
+        }
+
         if (order.getDeliveryPartner() == null ||
                 !order.getDeliveryPartner()
                         .getId()
-                        .equals(deliveryPartnerId)) {
+                        .equals(loggedInUser.getId())) {
 
             return ResponseEntity.status(403)
                     .body(
@@ -265,17 +521,63 @@ public class OrderController {
     // DELETE ORDER
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteOrder(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
-        if (!orderRepository.existsById(id)) {
+        String email = authentication.getName();
 
+        User loggedInUser = userRepository
+                .findByEmail(email)
+                .orElse(null);
+
+        if (loggedInUser == null) {
+            return ResponseEntity.status(401)
+                    .body("Unauthorized");
+        }
+
+        if (loggedInUser.getRole()
+                != User.Role.BUSINESS_OWNER) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - only BUSINESS_OWNER can manage business orders"
+                    );
+        }
+
+        Order order = orderRepository
+                .findById(id)
+                .orElse(null);
+
+        if (order == null) {
             return ResponseEntity.notFound().build();
         }
 
-        orderRepository.deleteById(id);
+        Business business = order.getBusiness();
 
-        return ResponseEntity.ok(
-                "Order deleted successfully"
-        );
+        if (business == null ||
+                business.getOwner() == null) {
+
+            return ResponseEntity.status(400)
+                    .body(
+                            "Order is not associated with a valid business owner"
+                    );
+        }
+
+        if (!business.getOwner()
+                .getId()
+                .equals(loggedInUser.getId())) {
+
+            return ResponseEntity.status(403)
+                    .body(
+                            "Forbidden - you can only manage orders belonging to your own business"
+                    );
+        }
+
+        // Orders should not be physically deleted once
+        // they have entered the business workflow.
+        return ResponseEntity.status(400)
+                .body(
+                        "Orders cannot be deleted. Use the allowed cancellation workflow instead."
+                );
     }
 }
