@@ -35,17 +35,11 @@ public class OrderService {
     }
 
     @Transactional
-    public Order createOrder(OrderRequest request) {
+    public Order createOrder(
+            OrderRequest request,
+            User shopkeeper) {
 
-        Business business = businessRepository
-                .findById(request.getBusinessId())
-                .orElse(null);
-
-        User shopkeeper = userRepository
-                .findById(request.getShopkeeperId())
-                .orElse(null);
-
-        if (business == null || shopkeeper == null) {
+        if (shopkeeper == null) {
             return null;
         }
 
@@ -53,7 +47,24 @@ public class OrderService {
             return null;
         }
 
-        if (request.getItems() == null || request.getItems().isEmpty()) {
+        Business business = businessRepository
+                .findById(request.getBusinessId())
+                .orElse(null);
+
+        if (business == null) {
+            return null;
+        }
+
+        /*
+         * Shopkeeper must be associated with this business.
+         */
+        if (!business.getShopkeepers().contains(shopkeeper)) {
+            return null;
+        }
+
+        if (request.getItems() == null ||
+                request.getItems().isEmpty()) {
+
             return null;
         }
 
@@ -75,6 +86,17 @@ public class OrderService {
                 return null;
             }
 
+            /*
+             * Product must belong to the selected business.
+             */
+            if (product.getBusiness() == null ||
+                    !product.getBusiness()
+                            .getId()
+                            .equals(business.getId())) {
+
+                return null;
+            }
+
             Integer quantity = itemRequest.getQuantity();
 
             if (quantity == null || quantity <= 0) {
@@ -85,10 +107,10 @@ public class OrderService {
                 return null;
             }
 
-            if (!product.getBusiness().getId().equals(business.getId())) {
-                return null;
-            }
-
+            /*
+             * Price comes from the database.
+             * Client cannot choose the price.
+             */
             double itemTotal =
                     product.getProductPrice() * quantity;
 
@@ -103,6 +125,9 @@ public class OrderService {
 
             totalAmount += itemTotal;
 
+            /*
+             * Deduct stock.
+             */
             product.setProductStock(
                     product.getProductStock() - quantity
             );
